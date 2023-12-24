@@ -56,6 +56,7 @@ class TriggerLine:
     def __init__(self, feature):
         self.feature = feature
 
+
 @dataclass
 class Lane:
     id: str
@@ -74,30 +75,53 @@ class LaneDirection(enum.Enum):
     STRAIGHT = "STRAIGHT"
 
 
+class LaneType(enum.Enum):
+    VEHICLE = "VEHICLE"
+    CROSSWALK = "CROSSWALK"
+    BIKE_LANE = "BIKE_LANE"
+
+
+@dataclass
+class LaneProperties:
+    id: str
+    directions: list[LaneDirection]
+    lane_type: LaneType
+
 @staticmethod
-def get_directions_for_lane_group(lane_group_id):
+def get_lane_properties(lane_group_id):
     # Load lanes.json
     with open("lanes.json", "r") as lane_file:
         lanes = json.load(lane_file)
 
-    lane_directions = {}
+    lane_properties = {}
     for feature in lanes["features"]:
-        if feature["properties"]["laneGroupId"] == lane_group_id:
-            lane_directions[feature["properties"]["laneId"]] = []
-            for connection in feature["properties"]["connections"]:
-                for maneuver in connection["maneuvers"]:
-                    if "LEFT" in maneuver:
-                        lane_directions[feature["properties"]["laneId"]].append(LaneDirection.LEFT)
-                    elif "RIGHT" in maneuver:
-                        lane_directions[feature["properties"]["laneId"]].append(LaneDirection.RIGHT)
-                    elif "STRAIGHT" in maneuver:
-                        lane_directions[feature["properties"]["laneId"]].append(LaneDirection.STRAIGHT)
+        if feature["properties"]["laneGroupId"] != lane_group_id:
+            continue
 
-    # Remove duplicates
-    for lane_id, directions in lane_directions.items():
-        lane_directions[lane_id] = list(set(directions))
+        lane_id = feature["properties"]["laneId"]
+        lane_type = feature["properties"]["laneType"]
+        lane_directions = []
 
-    return lane_directions
+        # Get possible directions for lane
+        for connection in feature["properties"]["connections"]:
+            for maneuver in connection["maneuvers"]:
+                if "LEFT" in maneuver:
+                    lane_directions.append(LaneDirection.LEFT)
+                elif "RIGHT" in maneuver:
+                    lane_directions.append(LaneDirection.RIGHT)
+                elif "STRAIGHT" in maneuver:
+                    lane_directions.append(LaneDirection.STRAIGHT)
+
+        # Remove duplicates
+        lane_directions = list(set(lane_directions))
+
+        lane_properties[lane_id] = LaneProperties(
+            id=lane_id,
+            directions=lane_directions,
+            lane_type=LaneType(lane_type)
+        )
+
+    return lane_properties
 
 
 class APIClient:
@@ -160,10 +184,7 @@ class APIClient:
 
         lanes = []
         for feature in response.json()[0]["features"]:
-            # We only consider the Car lanes. There seems to be more lanes though (foot-traffic / bikes?)
-            if "CAR" not in feature.get("properties", {}).get("trafficTypes", []):
-                continue
-            if feature.get("properties", {}).get("laneType") != "VEHICLE":
+            if "trafficTypes" not in feature.get("properties", {}):
                 continue
             lanes.append(Lane(feature=feature))
 
@@ -172,7 +193,7 @@ class APIClient:
     def get_live_status(self, lane_group_id):
         # Lane-Group contains the intersection-id.
         # Be careful, we are NOT requesting using a specific lane but rather a lane-group!
-        lane_directions = get_directions_for_lane_group(lane_group_id)
+        all_lane_properties = get_lane_properties(lane_group_id)
 
         box_id = lane_group_id.split("_")[0]
         url = (self.get_url("get_live_status")
@@ -201,18 +222,20 @@ class APIClient:
                 trafficlight_state = lane_event[1]
                 time_left = lane_event[2]
                 timestamp = lane_event[3]
-                lane_direction = lane_directions.get(lane_id, [])
+                lane_properties = all_lane_properties.get(lane_id, None)
+                lane_direction = lane_properties.directions
 
                 # Handle dummy values (Traffic-Light off / Grey?)
                 if time_left > 200 or time_left < 0:
                     time_left = -1
 
-                # Skip lanes without direction. Possibly they are pedestrian lanes?
-                if len(lane_direction) == 0:
-                    continue
-
-                lane_direction_str = ", ".join([str(direction.value) for direction in lane_direction])
-                print(f"{time_left} \t {trafficlight_state} \t {lane_direction_str} \t {lane_id}")
+                if lane_properties.lane_type == LaneType.CROSSWALK:
+                    lane_direction_str = "N/A"
+                elif lane_properties.lane_type == LaneType.VEHICLE:
+                    lane_direction_str = ", ".join([str(direction.value) for direction in lane_direction])
+                elif lane_properties.lane_type == LaneType.BIKE_LANE:
+                    lane_direction_str = ", ".join([str(direction.value) for direction in lane_direction])
+                print(f"{time_left} \t {lane_properties.lane_type.name} \t {trafficlight_state} \t {lane_direction_str} \t {lane_id}")
 
             # Newline
             print("")
