@@ -20,6 +20,7 @@ api_data = {
     "urls": {
         "get_token": "/auth/realms/spat/protocol/openid-connect/token",
         "get_boxes": "/spatmap/spat-ui-backend/v1/map-data/spatBoxes",
+        "get_trigger_lines": "/spatmap/spat-ui-backend/v1/map-data/spatBoxes/{spatboxId}/triggerline",
         "get_lane_map": "/spatmap/spat-ui-backend/v1/map-data/spatBoxes/{spatboxId}/signalizedIntersectionMap",
         "get_live_status":
             "/spatmap/spat-ui-backend/v1/live-data/spatBoxes/{spatboxId}/laneGroups/{laneGroupId}/broadcast",
@@ -47,6 +48,13 @@ class Box:
         self.longitude = feature["geometry"]["coordinates"][0]
         self.feature = feature
 
+
+@dataclass
+class TriggerLine:
+    feature: dict
+
+    def __init__(self, feature):
+        self.feature = feature
 
 @dataclass
 class Lane:
@@ -136,6 +144,14 @@ class APIClient:
 
         return intersections
 
+    def get_trigger_lines(self, box_id):
+        response = requests.get(self.get_url("get_trigger_lines").replace("{spatboxId}", box_id), headers={
+            "Accept": "application/json", "Authorization": "Bearer " + self.token
+        })
+
+        for feature in response.json():
+            yield TriggerLine(feature=feature)
+
     def get_lane_map(self, box_id):
         response = requests.get(self.get_url("get_lane_map").replace("{spatboxId}", box_id), headers={
             "Accept": "application/json",
@@ -203,9 +219,10 @@ class APIClient:
 
 
 def print_usage():
-    print("Usage: python3 signal2x-client.py <command> [<lange-group-id>]")
+    print("Usage: python3 signal2x-client.py <command>")
     print("Commands:")
     print("  get-intersections")
+    print("  get-trigger-lines <intersection-id>")
     print("  get-lane-map")
     print("  live-status <lane-group-id>")
 
@@ -224,6 +241,16 @@ if __name__ == "__main__":
         # Write all lanes to file
         geojson_output = {"type": "FeatureCollection", "features": [box.feature for box in boxes]}
         with open("intersections.json", "w") as f:
+            json.dump(geojson_output, f, indent=4)
+    elif command == "get-trigger-lines":
+        if len(sys.argv) < 3:
+            print_usage()
+            sys.exit(1)
+        trigger_lines = api_client.get_trigger_lines(sys.argv[2])
+
+        # Write all trigger-lines to file
+        geojson_output = {"type": "FeatureCollection", "features": [tl.feature for tl in trigger_lines]}
+        with open("triggers.json", "w") as f:
             json.dump(geojson_output, f, indent=4)
     elif command == "get-lane-map":
         # Download all available intersections first
