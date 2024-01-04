@@ -8,6 +8,9 @@ import sseclient
 import sys
 import time
 import urllib3
+import subprocess
+import os
+import webbrowser
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -262,6 +265,7 @@ def print_usage():
     print("  get-trigger-lines <intersection-id>")
     print("  get-lane-map")
     print("  live-status <lane-group-id>")
+    print("  startWebView")
 
 
 if __name__ == "__main__":
@@ -279,6 +283,52 @@ if __name__ == "__main__":
         geojson_output = {"type": "FeatureCollection", "features": [box.feature for box in boxes]}
         with open("intersections.json", "w") as f:
             json.dump(geojson_output, f, indent=4)
+    elif command == "startWebView":
+        # Arguments for the script
+        argument1 = "get-intersections"
+        argument2 = "get-lane-map"
+        
+        # Paths to the files to be checked
+        file_path1 = "intersections.json"
+        file_path2 = "lanes.json"
+        file_path3 = "intersectionsWebview.json"
+
+        # Check if intersections.json exists
+        if os.path.isfile(file_path1):
+            print(f"The file {file_path1} already exists.")
+        else:
+            print(f"The file {file_path1} doesn't exist, creating...")
+            # Execute the script
+            subprocess.run(["python", "lane-data.py", argument1])
+
+        # Check if lanes.json exists
+        if os.path.isfile(file_path2):
+            print(f"The file {file_path2} already exists.")
+        else:
+            print(f"The file {file_path2} doesn't exist, creating...")
+            # Execute the script
+            subprocess.run(["python", "lane-data.py", argument2])
+
+        # Check if intersectionsWebview.json exists
+        if os.path.isfile(file_path3):
+            print(f"The file {file_path3} already exists.")
+        else:
+            print(f"The file {file_path3} doesn't exist, creating...")
+            # Execute the script
+            subprocess.run(["python", "prepairWebview.py"])
+        # Get the current directory to start webviewer
+        current_directory = os.path.dirname(os.path.abspath(__file__))
+        # Name of the HTML file
+        html_file = "intersection-map5.html"
+        # Full path to the HTML file
+        html_file_path = os.path.join(current_directory, html_file)
+        # Check if the file exists
+        if os.path.isfile(html_file_path):
+            print(f"The file {html_file_path} exists. Opening the website...")
+            # Open the website in the default web browser
+            webbrowser.open(html_file_path)
+        else:
+            print(f"The file {html_file_path} doesn't exist.")
     elif command == "get-trigger-lines":
         if len(sys.argv) < 3:
             print_usage()
