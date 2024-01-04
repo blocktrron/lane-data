@@ -295,11 +295,17 @@ if __name__ == "__main__":
 
         # Get all Lanes for the intersections
         lanes = []
-        for intersection in intersections:
+        total_intersections = len(intersections)
+        
+        for index, intersection in enumerate(intersections):
+            # Get the lane map for the current intersection
             lane_map = api_client.get_lane_map(intersection.id)
             lanes += lane_map
 
-            # Wait for random time 100-950ms to not overload the server
+            # Print progress
+            print(f"\rProgress: {index + 1}/{total_intersections}", end='', flush=True)
+
+            # Wait for a random time between 100 and 950 ms to avoid overloading the server
             time.sleep(random.randint(100, 950) / 1000)
 
         # Write all lanes to file
