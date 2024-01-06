@@ -32,6 +32,7 @@
 
     let featureMap = {};
     let activeLaneGroup = null;
+    let activeIntersection = null;
 
     function setLaneColor(targetLaneId, color) {
         for (const [laneGroupId, laneGroup] of Object.entries(featureMap)) {
@@ -39,6 +40,14 @@
                 if (laneId === targetLaneId) {
                     lane.setStyle({color: color});
                 }
+            }
+        }
+    }
+
+    function setDefaultColor() {
+        for (const [laneGroupId, laneGroup] of Object.entries(featureMap)) {
+            for (const [laneId, lane] of Object.entries(laneGroup)) {
+                lane.setStyle({color: default_color});
             }
         }
     }
@@ -65,27 +74,38 @@
 
     /* Create function which calls updateLaneGroup every second */
     setInterval(function() {
-        if (activeLaneGroup !== null) {
-            updateLaneGroup(activeLaneGroup['laneGroupId'])
+        if (activeIntersection !== null) {
+            /* Fetch each lane group */
+            activeIntersection['laneGroupIds'].forEach(function (laneGroupId) {
+                updateLaneGroup(laneGroupId)
+            });
         }
-    }, 1000);
+    }, 500);
 
-    function deactivateLaneGroup() {
-        if (activeLaneGroup !== null) {
-            for (const [laneId, lane] of Object.entries(activeLaneGroup['layers'])) {
-                lane.setStyle({color: default_color});
-            }
-        }
-        activeLaneGroup = null
+    function deactivateIntersection() {
+        setDefaultColor();
+        activeIntersection = null
     }
 
-    function activateLaneGroup(laneGroupId) {
-        deactivateLaneGroup();
-        activeLaneGroup = {layers: featureMap[laneGroupId], laneGroupId: laneGroupId};
-        for (const [laneId, lane] of Object.entries(featureMap[laneGroupId])) {
-            console.log(lane)
-            lane.setStyle({color: pending_color});
+    function activateIntersection(intersectionId) {
+        deactivateIntersection();
+        activeIntersection = {intersectionId: intersectionId, layers: [], laneGroupIds: []};
+
+        for (const [laneGroupId, laneGroup] of Object.entries(featureMap)) {
+            let laneGroupIntersectionId = laneGroupId.split('_')[0];
+            if (laneGroupIntersectionId === intersectionId) {
+                activeIntersection['laneGroupIds'].push(laneGroupId);
+                for (const [laneId, lane] of Object.entries(laneGroup)) {
+                    activeIntersection['layers'].push(lane);
+                    lane.setStyle({color: pending_color});
+                }
+            }
         }
+    }
+
+    function activateIntersectionOfLaneGroup(laneGroupId) {
+        let intersectionId = laneGroupId.split('_')[0];
+        activateIntersection(intersectionId);
     }
 
     function onGeoJsonLaneAdd(feature, layer) {
@@ -93,7 +113,7 @@
         layer.on('click', function (e) {
             /* get laneGroupId */
             const laneGroupId = e.target.feature.properties.laneGroupId;
-            activateLaneGroup(laneGroupId)
+            activateIntersectionOfLaneGroup(laneGroupId)
         });
 
         layer.setStyle({color: default_color});
