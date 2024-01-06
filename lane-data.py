@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
         # Write all lanes to file
         geojson_output = {"type": "FeatureCollection", "features": [lane.feature for lane in lanes]}
-        with open("lanes.json", "w") as f:
+        with open("static/lanes.json", "w") as f:
             json.dump(geojson_output, f, indent=4)
     elif command == "live-status":
         if len(sys.argv) < 3:
@@ -73,7 +73,7 @@ if __name__ == "__main__":
             sys.exit(1)
         lane_group_id = sys.argv[2]
 
-        def console_cb(lane_events):
+        def console_cb(lane_group_id, lane_events):
             all_lane_properties = get_lane_properties(lane_group_id)
 
             # Clear terminal
@@ -117,6 +117,5 @@ if __name__ == "__main__":
 
             # Newline
             print("")
-
 
         asyncio.run(api_client.get_live_status(lane_group_id, console_cb))

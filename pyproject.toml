@@ -9,6 +9,7 @@ readme = "README.md"
 python = "^3.11"
 sseclient-py = "^1.8.0"
 requests = "^2.31.0"
+flask = "^3.0.0"
 
 
 [build-system]

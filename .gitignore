@@ -2,5 +2,6 @@
 __pycache__/
 boxes.json
 lanes.json
+intersections.json
 triggers.json
 *.pyc

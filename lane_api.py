@@ -1,3 +1,4 @@
+import asyncio
 import enum
 import json
 import requests
@@ -86,7 +87,7 @@ class LaneProperties:
 @staticmethod
 def get_lane_properties(lane_group_id):
     # Load lanes.json
-    with open("lanes.json", "r") as lane_file:
+    with open("static/lanes.json", "r") as lane_file:
         lanes = json.load(lane_file)
 
     lane_properties = {}
@@ -186,7 +187,7 @@ class APIClient:
 
         return lanes
 
-    async def get_live_status(self, lane_group_id, cb):
+    async def get_live_status(self, lane_group_id, cb, counter: list[int] = None):
         # Lane-Group contains the intersection-id.
         # Be careful, we are NOT requesting using a specific lane but rather a lane-group!
 
@@ -206,4 +207,10 @@ class APIClient:
             if event.event != "SignalizedLaneGroupState":
                 continue
 
-            cb(json.loads(event.data)[0])
+            if counter is not None:
+                if counter[0] == 0:
+                    return
+                counter[0] -= 1
+
+            cb(lane_group_id, json.loads(event.data)[0])
+

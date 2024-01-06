@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/eventsource-polyfill/0.9.6/eventsource.min.js"></script>
+
+    <style>
+        #map {
+            height: 100vh;
+        }
+    </style>
+</head>
+<body>
+<div id="map"></div>
+</body>
+<script type="text/javascript">
+    const default_color = 'grey';
+    const pending_color = 'purple';
+    const lanes_url = '/static/lanes.json'
+    const map = L.map('map').setView([49.871406284, 8.656024933], 13);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    let featureMap = {};
+    let activeLaneGroup = null;
+
+    function setLaneColor(targetLaneId, color) {
+        for (const [laneGroupId, laneGroup] of Object.entries(featureMap)) {
+            for (const [laneId, lane] of Object.entries(laneGroup)) {
+                if (laneId === targetLaneId) {
+                    lane.setStyle({color: color});
+                }
+            }
+        }
+    }
+    function updateLaneGroupColor(data) {
+        data.forEach(function (state) {
+            let lane_id = state[0];
+            let color = state[1];
+
+            if (color === "RED_YELLOW") {
+                color = "YELLOW";
+            }
+
+            setLaneColor(lane_id, color)
+        });
+    }
+
+    function updateLaneGroup(laneGroupId) {
+        fetch("/lane-group/" + laneGroupId)
+        .then(response => response.json())
+        .then(data => {
+            updateLaneGroupColor(data)
+        });
+    }
+
+    /* Create function which calls updateLaneGroup every second */
+    setInterval(function() {
+        if (activeLaneGroup !== null) {
+            updateLaneGroup(activeLaneGroup['laneGroupId'])
+        }
+    }, 1000);
+
+    function deactivateLaneGroup() {
+        if (activeLaneGroup !== null) {
+            for (const [laneId, lane] of Object.entries(activeLaneGroup['layers'])) {
+                lane.setStyle({color: default_color});
+            }
+        }
+        activeLaneGroup = null
+    }
+
+    function activateLaneGroup(laneGroupId) {
+        deactivateLaneGroup();
+        activeLaneGroup = {layers: featureMap[laneGroupId], laneGroupId: laneGroupId};
+        for (const [laneId, lane] of Object.entries(featureMap[laneGroupId])) {
+            console.log(lane)
+            lane.setStyle({color: pending_color});
+        }
+    }
+
+    function onGeoJsonLaneAdd(feature, layer) {
+        /* Add action on click on feature */
+        layer.on('click', function (e) {
+            /* get laneGroupId */
+            const laneGroupId = e.target.feature.properties.laneGroupId;
+            activateLaneGroup(laneGroupId)
+        });
+
+        layer.setStyle({color: default_color});
+
+        if (!(feature.properties.laneGroupId in featureMap)) {
+            featureMap[feature.properties.laneGroupId] = {};
+        }
+        featureMap[feature.properties.laneGroupId][feature.properties.laneId] = layer;
+    }
+
+    function setColor(feature, color) {
+        feature.setStyle({color: color});
+    }
+
+    // Add lanes.geojson to map
+    fetch(lanes_url)
+        .then(response => response.json())
+        .then(data => {
+            L.geoJSON(data, {
+                onEachFeature: onGeoJsonLaneAdd
+            }).addTo(map);
+        });
+
+
+
+    for (const [laneGroupId, laneGroup] of Object.entries(featureMap)) {
+        console.log(laneGroupId)
+        for (const [laneId, lane] of Object.entries(laneGroup)) {
+            lane.setStyle({color: 'red'});
+            console.log(lane)
+        }
+    }
+
+</script>
+</html>
