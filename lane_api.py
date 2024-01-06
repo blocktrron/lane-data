@@ -186,10 +186,9 @@ class APIClient:
 
         return lanes
 
-    def get_live_status(self, lane_group_id):
+    async def get_live_status(self, lane_group_id, cb):
         # Lane-Group contains the intersection-id.
         # Be careful, we are NOT requesting using a specific lane but rather a lane-group!
-        all_lane_properties = get_lane_properties(lane_group_id)
 
         box_id = lane_group_id.split("_")[0]
         url = (self.get_url("get_live_status")
@@ -206,45 +205,5 @@ class APIClient:
         for event in client.events():
             if event.event != "SignalizedLaneGroupState":
                 continue
-            # Clear terminal
-            print(chr(27) + "[2J")
 
-            # Print current Date and time in german format
-            print("=== " + datetime.now().strftime("%d.%m.%Y %H:%M:%S") + " ===")
-            lane_events = json.loads(event.data)[0]
-
-            # Order lane_events from left to right. Sort inverted.
-            # First on screen is leftmost lane.
-            lane_events = sorted(lane_events, key=lambda x: x[0].split("_")[1], reverse=True)
-
-            # Group lane_events by type in dict
-            lane_event_by_lane_type = {}
-            for lane_event in lane_events:
-                lane_id = lane_event[0]
-                lane_type = all_lane_properties.get(lane_id, None)
-                if lane_type is None:
-                    continue
-                lane_event_by_lane_type.setdefault(lane_type.lane_type, []).append(lane_event)
-
-            for lane_type in lane_event_by_lane_type:
-                print(f"--- {lane_type.name} ---")
-                for lane_event in lane_event_by_lane_type[lane_type]:
-                    lane_id = lane_event[0]
-                    trafficlight_state = lane_event[1]
-                    time_left = lane_event[2]
-                    timestamp = lane_event[3]
-                    lane_properties = all_lane_properties.get(lane_id, None)
-                    lane_direction = lane_properties.directions
-
-                    # Handle dummy values (Traffic-Light off / Grey?)
-                    if time_left > 200 or time_left < 0:
-                        time_left = -1
-
-                    if lane_properties.lane_type == LaneType.CROSSWALK:
-                        lane_direction_str = "N/A"
-                    elif lane_properties.lane_type in [LaneType.VEHICLE, LaneType.TRACKED_VEHICLE, LaneType.BIKE_LANE]:
-                        lane_direction_str = ", ".join([str(direction.value) for direction in lane_direction])
-                    print(f"{time_left} \t {lane_properties.lane_type.name} \t {trafficlight_state} \t {lane_direction_str} \t {lane_id}")
-
-            # Newline
-            print("")
+            cb(json.loads(event.data)[0])
