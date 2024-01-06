@@ -46,7 +46,7 @@ if __name__ == "__main__":
             json.dump(geojson_output, f, indent=4)
     elif command == "get-lane-map":
         # Download all available intersections first
-        intersections = api_client.get_intersections(api_data["bbox"]["darmstadt"])
+        intersections = api_client.get_intersections("darmstadt")
 
         # Get all Lanes for the intersections
         lanes = []
