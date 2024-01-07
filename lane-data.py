@@ -12,6 +12,11 @@ import urllib3
 from dataclasses import dataclass
 from datetime import datetime
 
+# Check Python version
+# Import List from typing for versions earlier than 3.9
+if sys.version_info < (3, 9):
+    from typing import List
+
 api_data = {
     "server": "https://spat.signal2xprod.aws.vmz.services",
     "bbox": {
@@ -85,7 +90,8 @@ class LaneType(enum.Enum):
 @dataclass
 class LaneProperties:
     id: str
-    directions: list[LaneDirection]
+    # Use List from typing for python versions earlier than 3.9
+    directions: List[LaneDirection] if sys.version_info < (3, 9) else list[LaneDirection]
     lane_type: LaneType
 
 @staticmethod
