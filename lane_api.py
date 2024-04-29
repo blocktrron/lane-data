@@ -6,7 +6,7 @@ import sseclient
 import urllib3
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 api_data = {
     "server": "https://spat.signal2xprod.aws.vmz.services",
@@ -124,6 +124,12 @@ def get_lane_properties(lane_group_id):
 class APIClient:
     def __init__(self):
         self.token = self.get_token()
+        self.token_date = datetime.now()
+
+    def update_token(self):
+        if self.token_date + timedelta(minutes=2) < datetime.now():
+            self.token = self.get_token()
+            self.token_date = datetime.now()
 
     @staticmethod
     def get_url(url_name):
@@ -145,6 +151,7 @@ class APIClient:
             return None
 
     def get_intersections(self, city):
+        self.update_token()
         # Intersections are called boxes because they contain the trigger area for the app
         # We are only interested in the intersection locations though
 
@@ -166,6 +173,7 @@ class APIClient:
         return intersections
 
     def get_trigger_lines(self, box_id):
+        self.update_token()
         response = requests.get(self.get_url("get_trigger_lines").replace("{spatboxId}", box_id), headers={
             "Accept": "application/json", "Authorization": "Bearer " + self.token
         })
@@ -174,6 +182,7 @@ class APIClient:
             yield TriggerLine(feature=feature)
 
     def get_lane_map(self, box_id):
+        self.update_token()
         response = requests.get(self.get_url("get_lane_map").replace("{spatboxId}", box_id), headers={
             "Accept": "application/json",
             "Authorization": "Bearer " + self.token
@@ -188,6 +197,7 @@ class APIClient:
         return lanes
 
     async def get_live_status(self, lane_group_id, cb, counter: list[int] = None):
+        self.update_token()
         # Lane-Group contains the intersection-id.
         # Be careful, we are NOT requesting using a specific lane but rather a lane-group!
 
@@ -202,6 +212,9 @@ class APIClient:
         http = urllib3.PoolManager()
         response = http.request('GET', url, preload_content=False, headers=headers)
 
+        if response.status != 200:
+            print("Error: ", response.status)
+            return
         client = sseclient.SSEClient(response)
         for event in client.events():
             if event.event != "SignalizedLaneGroupState":
@@ -209,8 +222,11 @@ class APIClient:
 
             if counter is not None:
                 if counter[0] == 0:
+                    client.close()
                     return
                 counter[0] -= 1
 
             cb(lane_group_id, json.loads(event.data)[0])
+
+        response.close()
 

@@ -25,10 +25,10 @@ def start_update_task(lane_group_id):
     is_present = lane_group_id in lane_group_status
 
     if is_present:
-        lane_group_status[lane_group_id][0] = 5
+        lane_group_status[lane_group_id][0] = 2
         return
     else:
-        lane_group_status[lane_group_id] = [5]
+        lane_group_status[lane_group_id] = [2]
     thread = Thread(target=update_task, args=(lane_group_id,))
     thread.start()
 
